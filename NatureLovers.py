@@ -12,6 +12,7 @@ BG_COLOR = (255, 255, 255)
 PLAYER_COLOR = (0, 255, 0)
 ENEMY_COLOR = (255, 0, 0)
 ANIMAL_COLOR = (255, 192, 203)
+PET_COLOR = (255, 165, 0)  # Orange color
 FOOD_COLOR = (0, 0, 255)
 NUM_ENEMIES = 31
 NUM_FOOD = 10
@@ -53,6 +54,11 @@ class World:
 
     def update(self):
         # Update game state
+
+        # Move pets
+        for pet in self.player.pets:
+            pet.move(self.cells)
+
         for enemy in self.enemies:
             # Move enemies randomly
             dx = random.choice([-1, 0, 1])
@@ -117,45 +123,54 @@ class Entity:
 class Player(Entity):
     def __init__(self, x, y):
         super().__init__(x, y)
-
         self.color = PLAYER_COLOR
         self.health = 100
+        self.food_eaten = 0
+        self.pets = []
 
     def move(self, dx, dy, cells):
+        new_x, new_y = self.x + dx, self.y + dy
 
-        # Check if move is valid
-        new_x = self.x + dx
-        new_y = self.y + dy
-        if new_x < 0 or new_x >= SCREEN_WIDTH // CELL_SIZE:
+        if new_x < 0 or new_x >= SCREEN_WIDTH // CELL_SIZE or new_y < 0 or new_y >= SCREEN_HEIGHT // CELL_SIZE:
             return False
-        if new_y < 0 or new_y >= SCREEN_HEIGHT // CELL_SIZE:
-            return False
+        
         new_cell = cells[new_x + new_y * (SCREEN_WIDTH // CELL_SIZE)]
 
-        if isinstance(new_cell.entity,Enemy):
+        if isinstance(new_cell.entity, Enemy):
             self.health -= 10
             if self.health <= 0:
                 return False
-        if isinstance(new_cell.entity,Food):
-            self.health += 10
-            generate_food(cells, 1)
-        
-        #if isinstance(new_cell.entity,Animal):
-        #    return False
 
-        #track past paths
+        if isinstance(new_cell.entity, Food):
+            self.health += 10
+            self.food_eaten += 1
+            generate_food(cells, 1)
+
+            if self.food_eaten % 5 == 0:
+                self.spawn_pets(cells)
+
+        if new_cell.entity is not None and not isinstance(new_cell.entity, Food):
+            return False
+
         dirty_cells.append(cells[self.x + self.y * (SCREEN_WIDTH // CELL_SIZE)])
-        
-        # Move entity
-        self.x = new_x
-        self.y = new_y
+
+        self.x, self.y = new_x, new_y
         new_cell.color = self.color
         new_cell.entity = self
-
-        #clean up pollution
         new_cell.pollution = 0
 
         return True
+
+    def spawn_pets(self, cells):
+        pets_spawned = 0
+        while pets_spawned < 2:
+            cell = random.choice(cells)
+            if cell.color == BG_COLOR and cell.entity is None:
+                pet = Pet(cell.x, cell.y, self)
+                self.pets.append(pet)
+                cell.color = PET_COLOR
+                cell.entity = pet
+                pets_spawned += 1
 
 class Enemy(Entity):
     def __init__(self, x, y):
@@ -239,7 +254,40 @@ class Animal(Entity):
         new_cell.entity = self
         return True
 
+class Pet(Entity):
+    def __init__(self, x, y, owner):
+        super().__init__(x, y)
+        self.color = PET_COLOR
+        self.owner = owner
 
+    def move(self, cells):
+        max_distance = 5
+        attempts = 0
+        while attempts < 10:
+            dx, dy = random.choice([(0, -1), (0, 1), (-1, 0), (1, 0)])
+            new_x, new_y = self.x + dx, self.y + dy
+            distance_to_owner = abs(new_x - self.owner.x) + abs(new_y - self.owner.y)
+
+            if (0 <= new_x < SCREEN_WIDTH // CELL_SIZE and
+                0 <= new_y < SCREEN_HEIGHT // CELL_SIZE and
+                distance_to_owner <= max_distance):
+
+                new_cell = cells[new_x + new_y * (SCREEN_WIDTH // CELL_SIZE)]
+
+                # Avoid collisions with all entities
+                if new_cell.entity is not None:
+                    attempts += 1
+                    continue
+
+                old_cell = cells[self.x + self.y * (SCREEN_WIDTH // CELL_SIZE)]
+                dirty_cells.append(old_cell)
+
+                self.x, self.y = new_x, new_y
+                new_cell.color = self.color
+                new_cell.entity = self
+                new_cell.pollution = 0
+                break
+            attempts += 1
 
 # Define game functions
 def generate_cells():
