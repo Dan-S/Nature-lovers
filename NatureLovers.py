@@ -6,7 +6,9 @@ import collections
 
 # Define game constants
 SCREEN_WIDTH = 800
-SCREEN_HEIGHT = 600
+SCREEN_HEIGHT = 600  # Original height
+POLLUTION_BAR_HEIGHT = 20  # Height of the pollution bar
+TOTAL_SCREEN_HEIGHT = SCREEN_HEIGHT + POLLUTION_BAR_HEIGHT
 CELL_SIZE = 10
 BG_COLOR = (255, 255, 255)
 PLAYER_COLOR = (0, 255, 0)
@@ -350,10 +352,20 @@ def draw_cells(cells, surface):
     for cell in cells:
         cell.draw(surface)
 
+# Pollution bar rendering function
+def draw_pollution_bar(screen, cells):
+    total_pollution = sum(cell.pollution for cell in cells)
+    max_pollution = len(cells) * 255
+    pollution_ratio = float(total_pollution) / max_pollution  # ensure float division
+
+    pygame.draw.rect(screen, (200, 200, 200), (10, SCREEN_HEIGHT + 5, SCREEN_WIDTH - 20, 10))
+    pygame.draw.rect(screen, (0, 0, 0), (10, SCREEN_HEIGHT + 5, int((SCREEN_WIDTH - 20) * pollution_ratio), 10))
+
+
 def main():
     # Initialize Pygame
     pygame.init()
-    screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+    screen = pygame.display.set_mode((SCREEN_WIDTH, TOTAL_SCREEN_HEIGHT))
     pygame.display.set_caption("Save the Environment")
 
     world = World()
@@ -389,12 +401,18 @@ def main():
                 elif event.key == pygame.K_RIGHT:
                     world.player.move(1, 0, world.cells)
 
-        # Move entities
         world.update()
 
-        # Draw screen
+        # First, clear the screen
         screen.fill(BG_COLOR)
+
+        # Then, draw the cells (game elements)
         draw_cells(world.cells, screen)
+
+        # Draw the pollution bar AFTER the cells
+        draw_pollution_bar(screen, world.cells)
+
+        # Lastly, update the display
         pygame.display.flip()
 
         screen.blit(text, (0,0))
