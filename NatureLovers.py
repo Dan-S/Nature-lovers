@@ -272,7 +272,7 @@ class Pet(Entity):
 
             if (0 <= new_x < SCREEN_WIDTH // CELL_SIZE and
                 0 <= new_y < SCREEN_HEIGHT // CELL_SIZE and
-                distance_to_owner <= max_distance):
+                (distance_to_owner <= max_distance or random.random() < 0.05)):
 
                 new_cell = cells[new_x + new_y * (SCREEN_WIDTH // CELL_SIZE)]
 
