@@ -16,6 +16,7 @@ FOOD_COLOR = (0, 0, 255)
 NUM_ENEMIES = 31
 NUM_FOOD = 10
 NUM_ANIMALS = 50
+VISION_RANGE = 4
 
 
 dirty_cells = []
@@ -59,15 +60,37 @@ class World:
             enemy.move(dx, dy, self.cells)
 
         for animal in self.animals:
-            up = self.get_cell_pollution(animal.x,animal.y-1)
-            down = self.get_cell_pollution(animal.x, animal.y+1)
-            left = self.get_cell_pollution(animal.x+1, animal.y)
-            right = self.get_cell_pollution(animal.x-1, animal.y)
+            directions = {
+                'up': (0, -1),
+                'down': (0, 1),
+                'left': (-1, 0),
+                'right': (1, 0)
+            }
 
-            idx = np.argmin([up, down, left, right])
-            moves = [(0,-1),(0,1),(1,0),(-1,0)]
+            avg_pollutions = {}
 
-            animal.move(*moves[idx],self.cells)
+            for direction, (dx, dy) in directions.items():
+                pollutions = []
+                for step in range(1, VISION_RANGE + 1):
+                    for offset in range(-VISION_RANGE, VISION_RANGE + 1):
+                        if direction in ['up', 'down']:
+                            check_x, check_y = animal.x + offset, animal.y + dy * step
+                        else:  # left or right
+                            check_x, check_y = animal.x + dx * step, animal.y + offset
+
+                        pollution = self.get_cell_pollution(check_x, check_y)
+                        if not np.isnan(pollution):
+                            pollutions.append(pollution)
+
+                # If no valid cells, set pollution high to avoid this direction
+                avg_pollutions[direction] = np.mean(pollutions) if pollutions else np.inf
+
+            # Choose the direction with the lowest average pollution
+            best_direction = min(avg_pollutions, key=avg_pollutions.get)
+            dx, dy = directions[best_direction]
+
+            animal.move(dx, dy, self.cells)
+
 
         for cell in dirty_cells:
             color_val = 255 - cell.pollution
